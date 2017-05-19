@@ -1,0 +1,358 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  map.cpp
+ *
+ *    Description:  tread safe map, realized as balanced tree (without color).  
+ *
+ *        Version:  1.0
+ *        Created:  17.05.2017 19:44:45
+ *       Revision:  none
+ *       Compiler:  g++ 4.9
+ *
+ *         Author:  Max Korchagin aka Vasy,  <vasy.chan@gmail.com>
+ *
+ * =====================================================================================
+ */
+
+#include <iostream>
+#include <algorithm>
+#include <memory>
+#include <iterator>
+#include <cstdlib>
+#include <iostream>
+#include <ctime>
+
+
+template<typename K, typename T>
+struct Node 
+{
+    using _node = Node<K,T>;
+
+    std::shared_ptr<Node<K,T>> m_parent = nullptr;
+    std::shared_ptr<Node<K,T>> m_left = nullptr;
+    std::shared_ptr<Node<K,T>> m_right = nullptr;
+    K m_key;
+    T m_value;
+
+    Node() { }
+
+    ~Node() { }
+
+    Node(K key, T value)
+        :m_key(key),
+        m_value(value) { }
+
+    Node(K key)
+        :m_key(key),
+        m_value(T()) { }
+
+    //TODO :statter, 110, make better 
+    Node<K,T>(const Node<K,T>& right)
+        {
+        //Node<K,T>* dest = new Node();
+        try
+            {
+            this->m_parent = right.m_parent;
+            this->m_left = right.m_left;
+            this->m_right = right.m_right;
+            this->m_key = right.m_key;
+            this->m_value = right.m_value;
+            }
+        catch(...)
+            {
+            throw;
+            }
+        }
+    
+    Node<K, T>& operator = (const Node<K, T>& right)
+        {
+        if ( *this != right )
+            {
+            Node<K, T>* new_node(right);
+            this = new_node; 
+            }
+        return *this;
+        }
+
+    Node<K, T> operator * ()
+        {
+        return *this;
+        }
+
+    bool operator != (Node<K,T> right)
+        {
+        //std::cout << " operator != " << this->m_parent << " curr " << this->m_left << "  val " << this->m_value << " next " << this->m_right << "\n";
+        //std::cout << " operator rigth != " << right.m_parent << " curr " << right.m_left << "  val " << right.m_value << " next " << right.m_right << "\n";
+        if ( right.m_key != this->m_key )
+            return true;
+        return false;
+        }
+    
+    // TODO: in-order tree
+    Node<K, T>& operator ++ ()
+        {
+        if ( this->m_left )
+            {
+            //std::cout << " operator ++  go left " << this->m_left->m_key << "\n";
+            auto tmp = this->m_left;
+            this->m_left = tmp->m_left;
+            this->m_right = tmp->m_right;
+            this->m_parent = tmp->m_parent;
+            this->m_key = tmp->m_key;
+            this->m_value = tmp->m_value;
+            return *this;
+            }
+        else if (this->m_right)
+            {
+            //std::cout << " operator ++  go right " << this->m_right->m_key << "\n";
+            auto tmp = this->m_right;
+            this->m_left = tmp->m_left;
+            this->m_right = tmp->m_right;
+            this->m_parent = tmp->m_parent;
+            this->m_key = tmp->m_key;
+            this->m_value = tmp->m_value;
+            return *this;
+            }
+        //std::cout << " after operator ++  prev " << this->m_parent << " curr " << this->m_left << "  val " << this->m_value << " next " << this->m_right << "\n";
+        return *this;
+        }
+
+    Node<K, T> operator ++ (int)
+        {
+        std::cout << " call prefix ++ " <<  "\n";
+        Node<K,T> tmp(*this);
+        operator ++();
+        return tmp; 
+        }
+
+    Node<K, T> operator == (const Node<K,T>& right)
+        {
+        if ( right.m_key == this->m_key )
+            return true;
+        return false;
+        }
+
+    bool operator < (const Node<K,T>& right)
+        {
+		//std::cout << " operator < " << this->m_key << " < " << right.m_key << " \n "; 
+        if (this->m_key < right.m_key )
+            return true;
+        return false;
+        }
+
+    bool operator > (const Node<K,T>& right)
+        {
+		//std::cout << " operator > " << this->m_key << " > " << right.m_key << " \n "; 
+        if (this->m_key > right.m_key )
+            return true;
+        return false;
+        }
+};
+
+template <typename K, typename T, typename COMPARE = std::less<K>>
+class map 
+{
+    public:
+    using _node = Node<K,T>;
+    using _node_ptr = std::shared_ptr<Node<K,T>>;
+    //using iterator =  node_iterator;
+
+
+    // our small iterator class. this is test map and we don't need full fuctional here
+    class iterator : public std::iterator<std::input_iterator_tag, K>
+    {
+        private:
+
+        public:
+        _node_ptr _impl;
+
+        //iterator(_node* impl):_impl(std::make_shared<_node>(impl)) {}
+        iterator(_node_ptr impl):_impl(impl) {}
+        iterator(const iterator& new_it):_impl(new_it._impl) {}
+        _node& get() { return *_impl; }
+        _node& operator * () { return *_impl;}
+        bool operator != (const iterator& right) { return right._impl != this->_impl; } 
+        iterator& operator ++ () { ++(*_impl); return *this; }
+        iterator operator ++ (int)
+            {
+            iterator tmp(*this);
+            operator ++();
+            return tmp; 
+            }
+    };
+
+    map():m_root(nullptr), m_begin(nullptr), m_back(nullptr) {}
+    // variables 
+    _node_ptr m_root;
+    iterator m_begin;
+    iterator m_back;
+
+    size_t _size = 0;
+
+    //typedef Node<K, T> iterator;
+    
+    iterator begin() { return iterator(m_root); };
+    //iterator end() { return *m_back; };
+    iterator end() { return m_back; };
+    
+    const size_t size() const { return _size; };
+
+    //Map<K,T>() {};  //TODO:
+
+   
+    // TODO: check for LEAKS, remove pointers
+    void insert(const std::pair<K, T>& data )
+        {
+        auto key = data.first;
+        auto val = data.second;
+
+        _node_ptr node (new _node(key, val));
+        _node_ptr  parent_node = nullptr;
+
+        if ( m_root == nullptr ) //first value in the map
+            {
+            m_begin = iterator(node);
+            m_back = iterator(node);
+			m_root = node;
+            }
+        else
+            {
+            _node_ptr current_node = nullptr;
+            current_node = m_root;
+            while ( current_node )
+                {
+                parent_node = current_node;
+                if ( *node > *current_node )
+					{
+					//m_root = current_node;
+                    current_node = current_node->m_right;
+					}
+                else
+					{
+					//m_root = node;
+                    current_node = current_node->m_left;
+					}
+                }
+            if ( *node < *parent_node )
+                {
+                parent_node->m_left = node;
+                }
+            else
+                {
+                parent_node->m_right = node;
+                }
+            //std::cout << " m_end  key = " << m_end->_impl->m_key << " val =  " << m_end->_impl->m_value << ", " ;
+            }
+        _size++; // increment size
+        }
+
+	iterator find(const K& key) const
+		{
+		_node_ptr search_node(new _node(key));	
+		_node_ptr current_node = m_root;
+		iterator it = iterator(m_root);
+		size_t count_iteration = 0;
+		while(current_node)
+			{
+			count_iteration++;
+			//std::cout << "looking for node " << current_node->m_key <<  " search_node " << search_node->m_key <<  "\n";
+			if ( *search_node > *current_node)
+				{
+				current_node = current_node->m_right;
+				} 
+			else if (*search_node < *current_node)
+				{
+				current_node = current_node->m_left;
+				}
+			else
+				{
+				//std::cout << "found node " << current_node->m_key << " " << current_node->m_value << "\n";
+				#ifndef NDEBUG
+				std::cout << "find:: iteration count  " << count_iteration << "\n"; 
+				#endif
+				return iterator(current_node);
+				}
+			}
+		//if (current_node)
+		//	std::cout << "search false, last node " << current_node->m_key << "\n";
+		return iterator(m_root);
+		}
+    
+	void print_in_order(_node *root) 
+		{
+		if ( root)
+			{
+			print_in_order(root->m_left);
+			std::cout << " ====> " << root->m_key << " -> " << root->m_value << " \n";
+			print_in_order(root->m_right);
+			}
+		}
+};
+//template <typename T>
+//Node<T> map<T>::iterator = nullptr;
+
+int main()
+{
+std::srand(unsigned(std::time(0)));
+
+// defaut constructor
+map<int, int> testmap;
+for (int i = 0; i < 1000000; i++)
+{
+    int r = std::rand() % 10000;
+    testmap.insert(std::pair<int, int>(r, i));
+}
+
+std::cout << " ======== map info ========== " << "\n";
+std::cout << " root is " << testmap.m_root->m_key << "\n";
+std::cout << " size is " << testmap.size() << "\n";
+std::cout << " size is (kbytes) " <<  "\n";
+std::cout << " ======== map info ========== " << "\n";
+//testmap.print_in_order(testmap.m_root);
+
+// test for find
+for (int i = 0; i < 10; i++)
+{
+    int r = std::rand() % 10000;
+	//std::cout << " take key = " << r << " " ;
+	map<int,int>::iterator it = testmap.find(r);
+    if ( it != testmap.end() )
+		{
+		std::cout << " found key in the map " <<  (*it).m_key << " " << (*it).m_value << "\n ";
+		}
+}
+//for ( auto& i : testmap )
+int j = 0;
+for ( map<int,int>::iterator it = testmap.begin(); j < 9; it++, j++)
+{
+    std::cout << " key " << (*it).m_key <<  "  val " << (*it).m_value  << "\n";
+}
+/*
+map<int>::iterator test_it = testmap.begin();
+test_it++;
+test_it++;
+
+testmap.insert(test_it, 200);
+
+std::cout << " ========================== \n";
+
+*/
+
+/*
+int count =0;
+while(++count < 9)
+{
+    
+}
+//for ( auto&& i : testmap )
+ int i = 0;
+for ( Map<int,int>::iterator it = testmap.begin(); i < 9; it++, i++)
+{
+    //std::cout << " prev " << *(i).m_parent << " self " << i.m_left << " key " << i.m_key <<  "  val " << i.m_value << " next " << i.m_right << "\n";
+    auto lnode = *it;
+    std::cout << " key " << lnode.m_key <<  "  val " << lnode.m_value  << "\n";
+}
+*/
+return 0;
+}
